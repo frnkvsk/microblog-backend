@@ -3,7 +3,7 @@
 const db = require("../db");
 const express = require("express");
 const router = express.Router({ mergeParams: true });
-
+const { ensureCorrectUser, authRequired } = require("../middleware/auth");
 
 /** GET /        get comments for post
  *
@@ -29,7 +29,7 @@ router.get("/", async function (req, res, next) {
  *
  */
 
-router.post("/:id", async function (req, res, next) {
+router.post("/:id", authRequired, async function (req, res, next) {
   try {
     const result = await db.query(
       `INSERT INTO comments (text, post_id) VALUES ($1, $2) 
@@ -48,7 +48,7 @@ router.post("/:id", async function (req, res, next) {
  *
  */
 
-router.put("/:id", async function (req, res, next) {
+router.put("/:id", ensureCorrectUser, async function (req, res, next) {
   try {
     const result = await db.query(
       "UPDATE comments SET text=$1 WHERE id = $2 RETURNING id, text",
@@ -66,7 +66,7 @@ router.put("/:id", async function (req, res, next) {
  *
  */
 
-router.delete("/:id", async function (req, res, next) {
+router.delete("/:id", ensureCorrectUser, async function (req, res, next) {
   try {
     await db.query("DELETE FROM comments WHERE id=$1", [req.params.id]);
     return res.json({ message: "deleted" });

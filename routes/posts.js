@@ -3,7 +3,7 @@
 const db = require("../db");
 const express = require("express");
 const router = new express.Router();
-
+const { ensureCorrectUser, authRequired } = require("../middleware/auth");
 /** GET /   get overview of posts
  *
  * Returns:
@@ -80,7 +80,7 @@ router.get("/:id", async function (req, res, next) {
  *
  */
 
-router.post("/:id/vote/:direction", async function (req, res, next) {
+router.post("/:id/vote/:direction", authRequired, async function (req, res, next) {
   try {
     let delta = req.params.direction === "up" ? +1 : -1;
     const result = await db.query(
@@ -99,7 +99,7 @@ router.post("/:id/vote/:direction", async function (req, res, next) {
  *
  */
 
-router.post("/", async function (req, res, next) {
+router.post("/", authRequired, async function (req, res, next) {
   try {
     const {title, body, description} = req.body;
     const result = await db.query(
@@ -120,7 +120,7 @@ router.post("/", async function (req, res, next) {
  *
  */
 
-router.put("/:id", async function (req, res, next) {
+router.put("/:id", ensureCorrectUser, async function (req, res, next) {
   try {
     const {title, body, description} = req.body;
     const result = await db.query(
@@ -141,7 +141,7 @@ router.put("/:id", async function (req, res, next) {
  *
  */
 
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", ensureCorrectUser, async (req, res, next) => {
   try {
     await db.query("DELETE FROM posts WHERE id = $1", [req.params.id]);
     return res.json({ message: "deleted" });
