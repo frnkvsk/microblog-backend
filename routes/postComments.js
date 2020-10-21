@@ -11,7 +11,7 @@ const { ensureCorrectUser, authRequired } = require("../middleware/auth");
  *
  */
 
-router.get("/", async function (req, res, next) {
+router.get("/:id", async function (req, res, next) {
   try {
     const result = await db.query(
       "SELECT id, text FROM comments WHERE post_id = $1 ORDER BY id",
@@ -29,12 +29,17 @@ router.get("/", async function (req, res, next) {
  *
  */
 
-router.post("/:id", authRequired, async function (req, res, next) {
+router.post("/:id", async function (req, res, next) {
   try {
     const result = await db.query(
       `INSERT INTO comments (text, post_id) VALUES ($1, $2) 
-        RETURNING id, text`,
-      [req.body.text, req.params.id]);
+        RETURNING id, text`
+        [req.body.text, req.params.id]);
+    const comment_id = result.rows[0].id;
+    await db.query(`INSERT INTO comment_user (comment_id, username) 
+                    VALUES ($1, $2)`
+                    [comment_id, req.body.username]);
+      
     return res.json(result.rows[0]);
   } catch (err) {
     return next(err);

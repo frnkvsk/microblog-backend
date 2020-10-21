@@ -104,14 +104,6 @@ class User {
       throw error;
     }
 
-    // const userJobsRes = await db.query(
-    //     `SELECT j.id, j.title, j.company_handle, a.state 
-    //        FROM applications AS a
-    //          JOIN jobs AS j ON j.id = a.job_id
-    //        WHERE a.username = $1`,
-    //     [username]);
-
-    // user.jobs = userJobsRes.rows;
     return user;
   }
 

@@ -5,3 +5,6 @@
 3.  `nodemon`
 
 All routes are prefixed with `/api` so to fetch posts the route is `GET /api/posts`
+
+## Database Design
+![db](./public/images/microblogdb.svg)

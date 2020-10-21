@@ -4,6 +4,7 @@ const db = require("../db");
 const express = require("express");
 const router = new express.Router();
 const { ensureCorrectUser, authRequired } = require("../middleware/auth");
+
 /** GET /   get overview of posts
  *
  * Returns:
@@ -24,8 +25,9 @@ router.get("/", async function (req, res, next) {
       `SELECT p.id,
               p.title,
               p.description,
-              p.votes
-      FROM posts p 
+              SUM(v.direction) votes
+      FROM posts p, votes v
+      WHERE posts.id = votes.post_id 
       ORDER BY p.id
       `
     );
@@ -55,13 +57,13 @@ router.get("/:id", async function (req, res, next) {
               p.title,
               p.description,
               p.body,
-              p.votes,
+              SUM(v.direction) votes      
               CASE WHEN COUNT(c.id) = 0 THEN JSON '[]' ELSE JSON_AGG(
                     JSON_BUILD_OBJECT('id', c.id, 'text', c.text)
                 ) END AS comments
-      FROM posts p 
+        FROM posts p, votes v 
         LEFT JOIN comments c ON c.post_id = p.id
-      WHERE p.id = $1
+      WHERE p.id = $1 AND v.post_id = $1
       
       GROUP BY p.id    
       ORDER BY p.id
@@ -76,15 +78,18 @@ router.get("/:id", async function (req, res, next) {
 
 /** POST /[id]/vote/(up|down)    Update up/down as post
  *
- * => { votes: updated-vote-count }
+ * => {  }
  *
  */
 
 router.post("/:id/vote/:direction", authRequired, async function (req, res, next) {
   try {
-    let delta = req.params.direction === "up" ? +1 : -1;
+    const delta = req.params.direction === "up" ? +1 : -1;
+    const username= req.params.username;
     const result = await db.query(
-      "UPDATE posts SET votes=votes + $1 WHERE id = $2 RETURNING votes",
+      `INSERT INTO votes (post_id, username, direction) 
+        VALUES ($1, $2, $3)`,
+      [req.params.id, username, direction]);
       [delta, req.params.id]);
     return res.json(result.rows[0]);
   } catch (err) {
@@ -95,18 +100,18 @@ router.post("/:id/vote/:direction", authRequired, async function (req, res, next
 
 /** POST /     add a new post
  *
- * { title, description, body }  =>  { id, title, description, body, votes }
+ * { title, body, description, username }  =>  { id, title, body, description, username }
  *
  */
 
 router.post("/", authRequired, async function (req, res, next) {
   try {
-    const {title, body, description} = req.body;
+    const {title, body, description, username} = req.body;
     const result = await db.query(
-      `INSERT INTO posts (title, description, body) 
-        VALUES ($1, $2, $3) 
+      `INSERT INTO posts (title, description, body, username) 
+        VALUES ($1, $2, $3, $4) 
         RETURNING id, title, description, body, votes`,
-      [title, description, body]);
+      [title, description, body, username]);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     return next(err);
@@ -126,7 +131,7 @@ router.put("/:id", ensureCorrectUser, async function (req, res, next) {
     const result = await db.query(
       `UPDATE posts SET title=$1, description=$2, body=$3
         WHERE id = $4 
-        RETURNING id, title, description, body, votes`,
+        RETURNING id, title, description, body, username`,
       [title, description, body, req.params.id]);
     return res.json(result.rows[0]);
   } catch (e) {
