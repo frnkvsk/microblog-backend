@@ -25,7 +25,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use("/api/posts/:post_id/comments", postCommentsRoutes);
+app.use("/api/posts/comments", postCommentsRoutes);
 app.use("/api/posts", postsRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/", authRoutes);

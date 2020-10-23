@@ -34,7 +34,9 @@ router.get("/:username", authRequired, async function(req, res, next) {
   }
 });
 
-/** POST / {userdata}  => {token: token} */
+/** 
+ * register
+ * POST / {userdata}  => {token: token} */
 
 router.post("/", async function(req, res, next) {
   try {

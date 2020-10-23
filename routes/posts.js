@@ -25,10 +25,11 @@ router.get("/", async function (req, res, next) {
       `SELECT p.id,
               p.title,
               p.description,
-              SUM(v.direction) votes
-      FROM posts p, votes v
-      WHERE posts.id = votes.post_id 
-      ORDER BY p.id
+              COALESCE(SUM(v.direction),0) votes
+       FROM posts p
+       LEFT JOIN votes v ON p.id = v.post_id
+       GROUP BY p.id
+       ORDER BY p.id;
       `
     );
     return res.json(result.rows);
@@ -45,7 +46,7 @@ router.get("/", async function (req, res, next) {
  *        title,
  *        description,
  *        body,
- *        votes,
+ *        username,
  *        comments: [ { id, text }, ... ],
  *      }
  */
@@ -57,18 +58,24 @@ router.get("/:id", async function (req, res, next) {
               p.title,
               p.description,
               p.body,
-              SUM(v.direction) votes      
+              p.username,               
               CASE WHEN COUNT(c.id) = 0 THEN JSON '[]' ELSE JSON_AGG(
                     JSON_BUILD_OBJECT('id', c.id, 'text', c.text)
                 ) END AS comments
-        FROM posts p, votes v 
-        LEFT JOIN comments c ON c.post_id = p.id
-      WHERE p.id = $1 AND v.post_id = $1
-      
+        FROM posts p 
+        LEFT JOIN comments c ON c.post_id = $1
+      WHERE p.id = $1   
       GROUP BY p.id    
       ORDER BY p.id
       `, [req.params.id]
     );
+    const votes = await db.query(
+      `SELECT COALESCE(SUM(v.direction),0) votes
+      FROM votes v
+      WHERE post_id = $1`,
+      [req.params.id]
+    );
+    result.rows[0].votes = votes;
     return res.json(result.rows[0]);
   } catch (err) {
     return next(err);
@@ -85,12 +92,13 @@ router.get("/:id", async function (req, res, next) {
 router.post("/:id/vote/:direction", authRequired, async function (req, res, next) {
   try {
     const delta = req.params.direction === "up" ? +1 : -1;
-    const username= req.params.username;
+    const username= req.username;
     const result = await db.query(
       `INSERT INTO votes (post_id, username, direction) 
-        VALUES ($1, $2, $3)`,
-      [req.params.id, username, direction]);
-      [delta, req.params.id]);
+        VALUES ($1, $2, $3)
+        ON CONFLICT (post_id, username) DO UPDATE
+        SET direction = $3`,
+      [req.params.id, username, delta]);
     return res.json(result.rows[0]);
   } catch (err) {
     return next(err);
@@ -106,11 +114,12 @@ router.post("/:id/vote/:direction", authRequired, async function (req, res, next
 
 router.post("/", authRequired, async function (req, res, next) {
   try {
-    const {title, body, description, username} = req.body;
+    const {title, body, description} = req.body;
+    const username = req.username;
     const result = await db.query(
       `INSERT INTO posts (title, description, body, username) 
         VALUES ($1, $2, $3, $4) 
-        RETURNING id, title, description, body, votes`,
+        RETURNING id, title, description, body, username`,
       [title, description, body, username]);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -121,7 +130,7 @@ router.post("/", authRequired, async function (req, res, next) {
 
 /** PUT /[id]     update existing post
  *
- * { title, description, body }  =>  { id, title, description, body, votes }
+ * { title, description, body }  =>  { id, title, description, body, username }
  *
  */
 
