@@ -1,20 +1,20 @@
 /** Database connection for Microblog. */
 
-const { Client } = require("pg");
+const { Client } = require('pg');
 
-// database username
-const databaseUserName = "postgres";
-
-// database user password
-const databaseUserPassword = "springboard";
-
-// port
-const port = "5432";
-
-let DB_URI = `postgres://${ databaseUserName }:${ databaseUserPassword }@localhost:${ port }/microblog`;
-const client = new Client(process.env.DATABASE_URL || DB_URI);
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
 client.connect();
 
-
-module.exports = client;
+client.query('SELECT table_schema,table_name FROM information_schema.tables;', (err, res) => {
+  if (err) throw err;
+  for (let row of res.rows) {
+    console.log(JSON.stringify(row));
+  }
+  client.end();
+});
